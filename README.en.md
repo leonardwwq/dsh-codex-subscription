@@ -41,6 +41,10 @@ The DSH `plugin` command uses the profile's own package-manager configuration, w
 
 If the settings page reports that it cannot read the account status and the plugin log (`~/.dsh/state/codex-subscription/diagnostic-log.jsonl`) contains `openai-codex is already registered` or a similar duplicate-provider message, another profile entry may own the same provider. The usual cause is `providers: { openai-codex: {} }` under `@deepseek-ai/dsh-llm-pi-ai` in `cordis.patch.yml`. This plugin owns that route: remove the duplicate provider config, keep the plugin's own `codex-subscription` entry, and restart DSH.
 
+## Personal fork maintenance
+
+This fork is maintained independently. Routine CI checks this repository's tests and build without comparing the upstream npm package version or automatically tracking or publishing upstream updates. Automatic npm publishing is disabled. Keeping upstream attribution and licenses does not require tracking upstream versions.
+
 ## Feedback
 
 Report fork-specific problems using the [fork's issue template](https://github.com/leonardwwq/dsh-codex-subscription/issues/new?template=install-problem.yml), including the DSH version, installation source and reproduction steps. Do not report fork-specific problems as upstream defects.

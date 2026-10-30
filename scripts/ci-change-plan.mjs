@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { testGroup } from './test-groups.mjs'
 
@@ -25,26 +25,13 @@ function normalizeBase(candidate) {
   }
 }
 
-function compareVersions(left, right) {
-  const parse = value => String(value).replace(/^v/u, '').split('-', 1)[0].split('.').map(Number)
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < 3; index += 1) {
-    if ((a[index] ?? 0) !== (b[index] ?? 0)) return (a[index] ?? 0) - (b[index] ?? 0)
-  }
-  return 0
-}
-
 const base = normalizeBase(argument('--base'))
-const publishedVersion = argument('--published')
-const packageVersion = argument('--package-version') ?? JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 const explicitFiles = argument('--files')
 const files = (explicitFiles === undefined ? git('diff', '--name-only', `${base}...HEAD`) : explicitFiles)
   .split(',').flatMap(value => value.split(/\r?\n/u)).map(value => value.trim()).filter(Boolean)
 const matches = patterns => files.some(file => patterns.some(pattern => pattern.test(file)))
 
-// Manual CI is a validation-only way to rerun the complete acceptance matrix,
-// including after a test-only follow-up would otherwise select fewer gates.
+// Manual CI reruns all local validation gates, even after test-only changes.
 const fullAcceptance = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
 const plannerChanged = fullAcceptance || matches([/^scripts\/(?:ci-change-plan|test-groups|run-tests)\.mjs$/u, /^\.github\/workflows\/ci\.yml$/u,
   /^\.github\/scripts\/(?:accept-official-release\.ps1|test-official-runtime\.mjs|prepare-official-test-dependencies\.mjs)$/u])
@@ -75,23 +62,8 @@ const behavior = plannerChanged || runtime || changedTest('behavior') || matches
   /^pnpm-lock\.yaml$/u,
   /^pnpm-workspace\.yaml$/u,
 ])
-const official = plannerChanged || runtime || matches([
-  /^compatibility\.json$/u,
-  /^package\.json$/u,
-  /^pnpm-lock\.yaml$/u,
-  /^pnpm-workspace\.yaml$/u,
-])
-
-// Main can accumulate accepted fixes before a release. Equal versions still
-// run every runtime gate; publication and immutable assets have their own gates.
-if (runtime && publishedVersion && compareVersions(packageVersion, publishedVersion) < 0) {
-  console.error(`Runtime-bearing files changed, but package.json ${packageVersion} is behind published ${publishedVersion}.`)
-  console.error('Synchronize the package metadata with the current stable release before merging.')
-  process.exit(1)
-}
-
-const plan = { behavior, delivery, manager, official, runtime }
-console.log(JSON.stringify({ base, files, packageVersion, publishedVersion, plan }, null, 2))
+const plan = { behavior, delivery, manager, runtime }
+console.log(JSON.stringify({ base, files, plan }, null, 2))
 
 if (process.env.GITHUB_OUTPUT && existsSync(process.env.GITHUB_OUTPUT)) {
   appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(plan).map(([key, value]) => `${key}=${value}\n`).join(''))

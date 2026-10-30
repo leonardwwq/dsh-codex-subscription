@@ -43,6 +43,10 @@ DSH 的 `plugin` 命令会使用 profile 自己的包管理配置，未必与本
 
 设置页显示「无法读取账户状态」，插件日志（`~/.dsh/state/codex-subscription/diagnostic-log.jsonl`）里出现 `openai-codex is already registered` 或提示该 provider 已注册：说明 profile 里可能有别处注册了同一个 provider。最常见的是 `cordis.patch.yml` 给 `@deepseek-ai/dsh-llm-pi-ai` 配了 `providers: { openai-codex: {} }`。provider 路由归本插件所有，删掉那段配置（保留插件自身的 `codex-subscription` 条目）后重启 DSH 即可。
 
+## 自用维护
+
+这个 fork 独立维护：日常 CI 只检查本仓库的测试和构建，不比较上游 npm 包的版本，也不自动跟踪或发布上游更新。npm 自动发布已停用。保留上游归属和许可证不代表需要跟随上游版本。
+
 ## 反馈
 
 本 fork 的问题请在 [fork 仓库的反馈模板](https://github.com/leonardwwq/dsh-codex-subscription/issues/new?template=install-problem.yml)中反馈，注明 DSH 版本、安装来源和复现步骤；不要将 fork 特有的问题直接当作上游缺陷报告。

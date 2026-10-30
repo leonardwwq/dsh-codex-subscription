@@ -1,8 +1,6 @@
 name: DSH compatibility autopilot
 
 on:
-  schedule:
-    - cron: '29 */3 * * *'
   workflow_dispatch:
     inputs:
       dsh_version:
@@ -23,7 +21,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # This personal fork never runs the inherited compatibility autopilot.
   prepare:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
@@ -174,7 +174,7 @@ jobs:
 
   promote:
     needs: [prepare, windows-acceptance]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility == true && needs.prepare.outputs.changed == 'true' && needs.windows-acceptance.result == 'success'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility == true && needs.prepare.outputs.changed == 'true' && needs.windows-acceptance.result == 'success' && false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

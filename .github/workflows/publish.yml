@@ -44,7 +44,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This personal fork never runs inherited release jobs, including manual dispatches.
   preflight:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -216,7 +218,7 @@ jobs:
 
   release:
     needs: [preflight, verify, windows, official-acceptance]
-    if: inputs.verify_only != true && needs.preflight.outputs.needed == 'true' && needs.verify.result == 'success' && needs.windows.result == 'success' && needs.official-acceptance.result == 'success'
+    if: inputs.verify_only != true && needs.preflight.outputs.needed == 'true' && needs.verify.result == 'success' && needs.windows.result == 'success' && needs.official-acceptance.result == 'success' && false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -616,6 +618,7 @@ jobs:
     needs: [preflight, release]
     if: >-
       always() &&
+      false &&
       inputs.verify_only != true &&
       needs.preflight.result == 'success' &&
       (needs.preflight.outputs.needed == 'false' || needs.release.result == 'success')

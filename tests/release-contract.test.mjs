@@ -85,13 +85,11 @@ test('official DSH acceptance materializes one exact runner instead of resolving
   assert.match(script, /package\.json[\s\S]{0,160}\.version/u)
 })
 
-test('release acceptance includes the exact declared DSH release alongside public channels', () => {
+test('disabled release acceptance retains the declared DSH release alongside public channels', () => {
   const workflow = text('.github/workflows/publish.yml')
   assert.match(workflow, /channel: \[latest, accepted, 0\.1\.7-rc\.2, alpha, next\]/u)
   assert.match(workflow, /Get-Content -LiteralPath compatibility\.json -Raw \| ConvertFrom-Json\)\.latestTested/u)
-  const ci = text('.github/workflows/ci.yml')
-  assert.match(ci, /channel: \[latest, accepted, 0\.1\.7-rc\.2, alpha, next\]/u)
-  assert.match(ci, /Get-Content -LiteralPath compatibility\.json -Raw \| ConvertFrom-Json\)\.latestTested/u)
+  assert.match(workflow, /preflight:\s*\n\s*if: \$\{\{ false \}\}/u)
 })
 
 test('release is a prebuilt, documented, removable DSH bundle', () => {
@@ -208,9 +206,9 @@ test('release-age exceptions are pinned to the audited DeepSeek preview graph', 
   }
 })
 
-test('official DSH compatibility updates are detected, accepted, and then dispatched to the trusted publisher', () => {
+test('disabled compatibility workflow retains the inherited acceptance and publication layout', () => {
   const workflow = text('.github/workflows/upstream-compatibility.yml')
-  assert.match(workflow, /cron:\s*'29 \*\/3 \* \* \*'/u)
+  assert.doesNotMatch(workflow, /^  schedule:/mu)
   assert.match(workflow, /compareVersions[\s\S]*for version in "\$\{candidates\[@\]\}"/u)
   assert.match(workflow, /repos\/deepseek-ai\/deepseek-harness\/releases\/tags\/dsh-v/u)
   assert.match(workflow, /\.draft == false and \.immutable == true/u)
@@ -250,8 +248,7 @@ test('CI uploads the hidden release artifact only after asserting it exists', ()
   assert.doesNotMatch(workflow, /sha256sum dsh-codex\.ps1/u, 'ordinary CI should upload only the candidate package; release assets are built by the release gate')
 })
 
-test('official DSH install and web startup are hard gates before a release', () => {
-  const ci = text('.github/workflows/ci.yml')
+test('retained release workflow gates publication on official DSH install and web startup', () => {
   const publish = text('.github/workflows/publish.yml')
   const smokePath = new URL('../.github/scripts/accept-official-release.ps1', import.meta.url)
 
@@ -266,17 +263,13 @@ test('official DSH install and web startup are hard gates before a release', () 
   assert.match(smoke, /--config\.minimum-release-age=0[\s\S]*add[\s\S]*@deepseek-ai\/dsh@\$DshVersion/u)
   assert.match(smoke, /Remove-Item -LiteralPath \$resolvedAcceptance -Recurse -Force/u)
 
-  for (const workflow of [ci, publish]) {
-    assert.match(workflow, /Official DSH acceptance/u)
-    assert.match(workflow, workflow === ci
-      ? /channel: \[latest, (?:accepted, )?0\.1\.7-rc\.2, alpha, next\]/u
-      : /channel: \[latest, (?:accepted, )?0\.1\.7-rc\.2, alpha, next\]/u)
-    assert.match(workflow, /-DshVersion \$version/u)
-    assert.match(workflow, /accept-official-release\.ps1/u)
-    assert.match(workflow, /accept-official-release\.ps1 -PackagePath \$package -DshRunner pnpm/u)
-    assert.match(workflow, /actions\/download-artifact@v8/u)
-    assert.match(workflow, /official-acceptance:[\s\S]*?actions\/setup-node@v6[\s\S]*?package-manager-cache:\s*false/u)
-  }
+  assert.match(publish, /Official DSH acceptance/u)
+  assert.match(publish, /channel: \[latest, (?:accepted, )?0\.1\.7-rc\.2, alpha, next\]/u)
+  assert.match(publish, /-DshVersion \$version/u)
+  assert.match(publish, /accept-official-release\.ps1 -PackagePath \$package -DshRunner pnpm/u)
+  assert.match(publish, /actions\/download-artifact@v8/u)
+  assert.match(publish, /official-acceptance:[\s\S]*?actions\/setup-node@v6[\s\S]*?package-manager-cache:\s*false/u)
+  assert.match(publish, /preflight:\s*\n\s*if: \$\{\{ false \}\}/u)
   assert.match(smoke, /test-official-runtime\.mjs/u)
   assert.match(publish, /path:\s*\.candidate\/\*\.tgz[\s\S]*include-hidden-files:\s*true/u)
   assert.match(publish, /release:[\s\S]*actions\/download-artifact@v8[\s\S]*name:\s*release-candidate-\$\{\{ github\.sha \}\}[\s\S]*cp "\$package" \.artifacts\/dsh-codex-subscription\.tgz/u)
@@ -337,9 +330,7 @@ test('beta publishing stays a prerelease and never replaces npm latest or stable
   assert.match(workflow, /IS_PRERELEASE[\s\S]*--latest/u)
 })
 
-test('an alpha newer than the declared compatibility list is a notice, never a release blocker', () => {
-  for (const file of ['.github/workflows/ci.yml', '.github/workflows/publish.yml']) {
-    const workflow = text(file)
-    assert.match(workflow, /matrix\.channel \}\}'\s+-eq 'alpha'[\s\S]*?-notcontains \$version[\s\S]*?::notice title=DSH preview not declared::[\s\S]*?exit 0/u, file)
-  }
+test('retained release workflow treats an undeclared alpha as a notice', () => {
+  const workflow = text('.github/workflows/publish.yml')
+  assert.match(workflow, /matrix\.channel \}\}'\s+-eq 'alpha'[\s\S]*?-notcontains \$version[\s\S]*?::notice title=DSH preview not declared::[\s\S]*?exit 0/u)
 })

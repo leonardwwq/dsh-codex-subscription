@@ -62,9 +62,9 @@ test("issue intake acknowledges only recognized bug and feature reports", async 
   assert.doesNotMatch(workflow, /maintenance queue|implementation decision/i);
   assert.match(workflow, /dsh-version-check/);
   assert.match(workflow, /### Plugin version/);
-  assert.match(workflow, /registry\.npmjs\.org\/dsh-codex-subscription\/latest/);
+  assert.doesNotMatch(workflow, /registry\.npmjs\.org|\bfetch\s*\(/);
   assert.match(workflow, /github\.rest\.issues\.createComment/);
-  assert.match(workflow, /the current release is \$\{latest\}/);
+  assert.doesNotMatch(workflow, /plugin-predates-dsh|dsh-untested|dsh-version-check:outdated/);
   assert.doesNotMatch(workflow, /schedule:|close|state:\s*closed|merge/i);
 });
 

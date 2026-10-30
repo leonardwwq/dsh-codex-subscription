@@ -13,14 +13,6 @@ const bugBody = (plugin, dsh) => [
   '### Plugin version', '', plugin, '', '### DSH version', '', dsh, '', '### Failing area', '', 'Install or update',
 ].join('\n')
 
-const peers = (...versions) => ({ '@deepseek-ai/dsh-llm': versions.join(' || ') })
-// What npm returns: each release declares the DSH versions it was verified against.
-const registry = {
-  '2.3.0': { version: '2.3.0', peerDependencies: peers('0.1.7-rc.2', '0.2.0-rc.1', '0.2.0-rc.2') },
-  '2.2.4': { version: '2.2.4', peerDependencies: peers('0.1.7-rc.1', '0.1.7-rc.2') },
-  '3.2.1': { version: '3.2.1', peerDependencies: peers('0.2.1-rc.2', '0.2.1-rc.4') },
-}
-
 // Issue #220's report and proposal, with the local proxy address anonymized.
 const issue220 = `### Plugin version
 3.2.1
@@ -68,7 +60,7 @@ Windows 11 / gpt-6.1-sol / 系统代理 [local proxy]（mihomo，境外节点）
 
 补充：我本地把 \`retryPolicy\` 设成了 \`"20"\`（不是默认值），所以重试次数看起来很多——这属于我自己的配置，不在本次建议范围内。`
 
-async function run({ labels, body, action = 'opened', existingComments = [], latest = '2.3.0' }) {
+async function run({ labels, body, action = 'opened', existingComments = [] }) {
   const comments = []
   const added = []
   const fetched = []
@@ -83,9 +75,7 @@ async function run({ labels, body, action = 'opened', existingComments = [], lat
   const previousFetch = globalThis.fetch
   globalThis.fetch = async url => {
     fetched.push(String(url))
-    const tag = String(url).split('/').pop()
-    const manifest = tag === 'latest' ? registry[latest] : registry[tag]
-    return manifest ? Response.json(manifest) : new Response('not found', { status: 404 })
+    throw new Error(`Unexpected network request: ${url}`)
   }
   try {
     await intake(github, { repo: { owner: 'o', repo: 'r' }, issue: { number: 1 }, payload: { action, issue: { labels: labels.map(name => ({ name })), body } } })
@@ -102,22 +92,15 @@ test('a bug with a complete, current report only gets the acknowledgement', asyn
   assert.deepEqual(added, [])
 })
 
-test("an older plugin that does not declare the reporter's DSH gets the exact newest version from the registry", async () => {
-  const { comments } = await run({ labels: ['bug'], body: bugBody('2.2.4', '0.2.0-rc.2') })
-  assert.ok(comments.some(text => text.includes('dsh-version-check:plugin-predates-dsh') && text.includes('dsh-codex-subscription@2.3.0')))
-  assert.ok(comments.some(text => text.includes('dsh-version-check:outdated:2.3.0')))
-})
-
-test('a DSH version the newest release does not declare is reported as untested, not blamed on the reporter', async () => {
-  const { comments } = await run({ labels: ['bug'], body: bugBody('2.3.0', '0.3.0') })
-  assert.ok(comments.some(text => text.includes('dsh-version-check:dsh-untested') && text.includes('0.2.0-rc.2')))
-  assert.equal(comments.some(text => text.includes('plugin-predates-dsh')), false)
-})
-
-test("an older plugin that already declares the reporter's DSH only gets the outdated notice", async () => {
-  const { comments } = await run({ labels: ['bug'], body: bugBody('2.2.4', '0.1.7-rc.2') })
-  assert.equal(comments.some(text => text.includes('plugin-predates-dsh')), false)
-  assert.ok(comments.some(text => text.includes('dsh-version-check:outdated:2.3.0')))
+test('complete reports never query upstream or recommend a different version', async () => {
+  for (const [plugin, dsh] of [['2.2.4', '0.2.0-rc.2'], ['2.3.0', '0.3.0'], ['v9.0.0', 'v1.0.0']]) {
+    const { comments, added, fetched } = await run({ labels: ['bug'], body: bugBody(plugin, dsh) })
+    assert.equal(comments.length, 1)
+    assert.match(comments[0], /dsh-maintenance-ack/)
+    assert.doesNotMatch(comments[0], /dsh-version-check|please update|current release/i)
+    assert.deepEqual(added, [])
+    assert.deepEqual(fetched, [])
+  }
 })
 
 test('a bug without a DSH version asks for it and waits for the reporter', async () => {
@@ -151,7 +134,7 @@ test('a genuine feature request is not redirected', async () => {
 })
 
 test('issue #220 keeps its complete failure report and suggestions in one issue', async () => {
-  const { comments, added } = await run({ labels: ['enhancement'], body: issue220, latest: '3.2.1' })
+  const { comments, added } = await run({ labels: ['enhancement'], body: issue220 })
   assert.equal(comments.length, 1)
   assert.match(comments[0], /dsh-maintenance-ack/)
   assert.match(comments[0], /suggestions can stay in this issue/)
@@ -160,21 +143,19 @@ test('issue #220 keeps its complete failure report and suggestions in one issue'
 })
 
 test('mixed bug and enhancement labels never produce two acknowledgements', async () => {
-  const { comments, added } = await run({ labels: ['bug', 'enhancement'], body: issue220, latest: '3.2.1' })
+  const { comments, added } = await run({ labels: ['bug', 'enhancement'], body: issue220 })
   assert.equal(comments.length, 1)
   assert.match(comments[0], /dsh-maintenance-ack/)
   assert.doesNotMatch(comments[0], /dsh-feature-ack/)
   assert.deepEqual(added, [])
 })
 
-test('a partial mixed report asks only for its missing DSH version and preserves compatibility checks', async () => {
+test('a partial mixed report asks only for its missing DSH version', async () => {
   const { comments, added } = await run({ labels: ['enhancement'], body: bugBody('2.3.0', '_No response_') })
   assert.equal(comments.length, 2)
   assert.match(comments[1], /dsh-version-check:dsh-missing/)
   assert.doesNotMatch(comments[1], /dsh-version-check:missing|how you run|open a Bug|template=install-problem/)
   assert.deepEqual(added, ['waiting-for-reporter'])
-  const compatible = await run({ labels: ['enhancement'], body: bugBody('2.2.4', '0.2.0-rc.2') })
-  assert.ok(compatible.comments.some(text => text.includes('plugin-predates-dsh') && text.includes('dsh-codex-subscription@2.3.0')))
 })
 
 test('both missing versions are requested together without asking for fields already present', async () => {
@@ -214,7 +195,7 @@ test('an edited partial report asks for the remaining field without welcoming ag
 
 test('old misfiled or feature acknowledgements do not trigger a contradictory replacement welcome', async () => {
   for (const marker of ['<!-- dsh-misfiled -->', '<!-- dsh-feature-ack -->']) {
-    const { comments, added } = await run({ labels: ['enhancement'], body: issue220, latest: '3.2.1', existingComments: [marker] })
+    const { comments, added } = await run({ labels: ['enhancement'], body: issue220, existingComments: [marker] })
     assert.deepEqual(comments, [])
     assert.deepEqual(added, [])
   }

@@ -25,7 +25,7 @@ test('real host acceptance refuses to guess a host or use existing credentials',
   assert.match(source, /DSH_HOME: join\(home/u)
 })
 
-test('official cohort gates the candidate on credential-free RPC after web readiness', () => {
+test('retained official acceptance probes credential-free RPC after web readiness', () => {
   const script = readFileSync(new URL('../.github/scripts/accept-official-release.ps1', import.meta.url), 'utf8')
   assert.match(script, /\$env:DSH_HOME = Join-Path \$acceptanceRoot 'dsh-home'/u)
   assert.match(script, /foreach \(\$endpoint in @\('status', 'remote\/status'\)\)/u)
@@ -33,7 +33,7 @@ test('official cohort gates the candidate on credential-free RPC after web readi
   assert.match(script, /\$rpc\.result\.ok -ne \$true/u)
   assert.match(script, /\$rpc\.result\.value\.authenticated -ne \$false/u)
   assert.match(script, /Assert-InstalledOnce\s+Start-And-ProbeWeb/u)
-  for (const workflow of ['ci.yml', 'publish.yml', 'upstream-compatibility.yml']) {
+  for (const workflow of ['publish.yml', 'upstream-compatibility.yml']) {
     const source = readFileSync(new URL(`../.github/workflows/${workflow}`, import.meta.url), 'utf8')
     assert.match(source, /accept-official-release\.ps1/u, workflow)
   }
