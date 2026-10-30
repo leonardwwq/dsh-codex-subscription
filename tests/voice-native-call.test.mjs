@@ -15,28 +15,6 @@ test('only a local native desktop can select host audio', () => {
   assert.equal(nativeVoiceEligible({ ...local, __dshWebRtcFallback: false, navigator: { userAgent: 'Mozilla/5.0 (Windows) AppleWebKit/537.36 Chrome/130.0' } }), false)
 })
 
-test('native microphone RPC rejects remote and missing origins before invoking the host', async () => {
-  const routes = new Map()
-  let calls = 0
-  registerSubscriptionTransport({ fetch: { register(route) { routes.set(route.path, route); return () => {} } } }, () => { calls++; return { ok: true } })
-  const method = 'codex-subscription/voice/native/start'
-  const route = routes.get('/api/' + method)
-  const request = (host, origin) => new Request(host + '/api/' + method, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) }, body: JSON.stringify({ type: 'client-request', rpcId: 'a', method, payload: {} }) })
-  for (const [host, origin] of [['http://remote.example', 'http://remote.example'], ['http://localhost', 'https://remote.example'], ['http://localhost', undefined]]) {
-    assert.equal((await route.fetch(request(host, origin))).status, 403)
-  }
-  assert.equal(calls, 0)
-  assert.equal((await route.fetch(request('http://localhost', 'http://localhost'))).status, 200)
-  assert.equal(calls, 1)
-  const internal = new Request('http://dsh.internal/api/' + method, { method: 'POST', headers: {
-    'content-type': 'application/json', host: '127.0.0.1:24440', origin: 'http://127.0.0.1:24440',
-  }, body: JSON.stringify({ type: 'client-request', rpcId: 'b', method, payload: {} }) })
-  const remote = new Request(internal.clone(), { headers: { 'content-type': 'application/json', host: 'remote.example', origin: 'http://127.0.0.1:24440' } })
-  assert.equal((await route.fetch(internal)).status, 200, 'DSH virtual routing preserves the original local Host')
-  assert.equal(calls, 2)
-  assert.equal((await route.fetch(remote)).status, 403)
-})
-
 test('native RPC requires enabled calls, capture consent and control ownership', async () => {
   let started = 0, controlled = 0, enabled = false
   const handler = createSubscriptionRpcHandler({ preferences: { status: () => ({ voiceCall: enabled ? 'on' : 'off', voiceVoice: 'maple' }) }, nativeVoice: {

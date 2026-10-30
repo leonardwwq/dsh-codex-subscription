@@ -65,3 +65,16 @@ export function createHiddenModelDirectory({ provider, disabled, pinned, fallbac
     },
   }
 }
+
+/**
+ * Lite has no model-visibility controls. Leave legacy preferences untouched,
+ * but do not apply them to the directory; returning to the full edition then
+ * restores the user's previous choices without any migration or profile write.
+ */
+export function createLiteModelDirectory() {
+  return {
+    wrap: adapter => adapter,
+    settingsChanged: () => false,
+    dependenciesChanged: () => false,
+  }
+}

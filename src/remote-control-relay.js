@@ -414,6 +414,7 @@ export function createRemoteControlRelay(options) {
       }
       const stopBeat = () => { clearTimeout(handshake); clearInterval(ping); clearTimeout(silent); connecting.abort(); agent?.destroy() }
       ws.on('open', () => {
+        if (signal.aborted) { ws.close(); return }
         clearTimeout(handshake)
         state.status = 'connected'; state.connectedAt = now(); state.lastError = undefined
         diagnosticLog.info('phone', 'connected to the Codex relay')
@@ -436,7 +437,7 @@ export function createRemoteControlRelay(options) {
         reject(error)
       })
       ws.on('message', data => {
-        queue = queue.then(() => receive(String(data))).catch(error => { state.lastError = error?.code ?? 'protocol'; phoneLog('relay message failed', { code: error?.code, error: error?.message }, 'error') })
+        queue = queue.then(() => { if (!signal.aborted) return receive(String(data)) }).catch(error => { state.lastError = error?.code ?? 'protocol'; phoneLog('relay message failed', { code: error?.code, error: error?.message }, 'error') })
       })
       ws.on('error', error => { stopBeat(); reject(new RemoteControlError('socket', error?.message ?? 'socket error')) })
       ws.on('close', () => { stopBeat(); signal.removeEventListener('abort', onAbort); resolve() })
@@ -506,8 +507,10 @@ export function createRemoteControlRelay(options) {
     async stop() {
       stop?.abort()
       socket?.close()
-      await running
       resetStreams()
+      await running
+      enrolled = undefined
+      subscribeCursor = undefined
       state.status = 'stopped'
     },
   })

@@ -1,5 +1,6 @@
 import { clientRequestSchema } from '@deepseek-ai/dsh-client-connection'
 import { RPC_ENDPOINTS } from './rpc-contract.js'
+import { diagnosticLog } from './diagnostic-log.js'
 
 const localNativeRequest = request => {
   try {
@@ -39,8 +40,12 @@ export function registerSubscriptionTransport(connection, handler) {
             request.signal.throwIfAborted()
             result = await handler(endpoint, envelope.data.payload, request.signal)
           } catch {
+            // Exceptions can contain credentials, request bodies, and private URLs.
+            diagnosticLog.error('rpc', `request threw: ${endpoint}`)
             result = { ok: false, error: { code: 'internal', message: 'Subscription request failed', details: { issues: [] } } }
           }
+          if (result?.ok !== true) diagnosticLog.warn('rpc', `request failed: ${endpoint}`)
+          else if (endpoint === 'status') diagnosticLog.info('rpc', 'status answered')
           return Response.json({ type: 'server-response', rpcId: envelope.data.rpcId, result })
         },
       }))
@@ -49,5 +54,6 @@ export function registerSubscriptionTransport(connection, handler) {
     for (const dispose of disposers.reverse()) dispose()
     throw error
   }
+  diagnosticLog.info('rpc', `registered ${disposers.length} routes`)
   return () => { for (const dispose of disposers.reverse()) dispose() }
 }

@@ -1,9 +1,24 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createHiddenModelDirectory, visibleModels } from '../src/hidden-model-directory.js'
+import { createHiddenModelDirectory, createLiteModelDirectory, visibleModels } from '../src/hidden-model-directory.js'
 
 const models = ['a', 'b', 'c', 'd'].map(id => ({ id, name: id.toUpperCase() }))
 const idsOf = list => list.map(model => model.id)
+
+test('lite ignores legacy hidden models without mutating preferences or the adapter', async () => {
+  const disabled = ['a', 'b', 'c', 'd']
+  let emits = 0
+  const adapter = { listModels: async () => models, resolveModel: async id => ({ id }) }
+  const directory = createLiteModelDirectory({ disabled: () => disabled, emit: () => { emits++ } })
+  assert.equal(directory.wrap(adapter), adapter)
+  assert.deepEqual(await directory.wrap(adapter).listModels('openai-codex'), models)
+  assert.deepEqual(await directory.wrap(adapter).resolveModel('b'), { id: 'b' })
+  assert.equal(directory.settingsChanged([], disabled), false)
+  assert.equal(directory.dependenciesChanged(), false)
+  assert.deepEqual(disabled, ['a', 'b', 'c', 'd'])
+  assert.equal(emits, 0)
+  assert.deepEqual(idsOf(visibleModels(models, { disabled: () => disabled, fallback: () => 'c' })), ['c'])
+})
 
 test('hidden models leave the directory and stale ids are ignored', () => {
   assert.deepEqual(idsOf(visibleModels(models, { disabled: () => ['b', 'd', 'gone'] })), ['a', 'c'])

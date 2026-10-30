@@ -21,7 +21,7 @@ export function AccountEmail({ candidate, fallback, t, emailVisible, onClick }) 
 
 const signedInIds = account => account?.authenticated === true ? (account.accounts ?? []).map(candidate => candidate.id).filter(id => typeof id === 'string') : []
 
-export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active = true }) {
+export function AccountCard({ rpc, t, account, setAccount, onSignedOut, onAccountChange = () => {}, active = true }) {
   const [flow, setFlow] = useState()
   const flowGeneration = useRef(0)
   const [manualCode, setManualCode] = useState('')
@@ -81,6 +81,7 @@ export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active =
   const begin = (method, label) => {
     flowGeneration.current += 1
     setFlow(undefined); setBusy(true); setError(undefined)
+    onAccountChange()
     const loginLabel = adding && label === undefined ? `Account ${accounts.length + 1}` : label
     void call('login/start', { method, openExternal: true, ...(loginLabel === undefined ? {} : { label: loginLabel }) }).then(setFlow)
       .catch(() => setError(t('failed'))).finally(() => setBusy(false))
@@ -112,6 +113,7 @@ export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active =
     }).catch(() => setError(t('failed'))).finally(() => setBusy(false))
   }
   const logout = () => {
+    onAccountChange()
     setConfirmSignOut(false)
     setBusy(true); setError(undefined)
     void call('logout').then(next => {
@@ -119,6 +121,7 @@ export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active =
     }).catch(() => setError(t('failed'))).finally(() => setBusy(false))
   }
   const selectAccount = id => {
+    onAccountChange()
     setBusy(true); setError(undefined)
     void call('account/select', { id }).then(next => {
       setAccount(next); onSignedOut(); notifyQuickQuota()
@@ -126,6 +129,7 @@ export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active =
   }
   const removeAccount = id => {
     if (removeId !== id) { setRemoveId(id); return }
+    onAccountChange()
     setBusy(true); setError(undefined)
     void call('account/remove', { id }).then(next => {
       setAccount(next); setRemoveId(undefined); onSignedOut(); notifyQuickQuota()
@@ -154,15 +158,16 @@ export function AccountCard({ rpc, t, account, setAccount, onSignedOut, active =
   </div>
 }
 
-export function AccountFailureCard({ accountStatus, snapshot, t, rpc, onRecovered }) {
+export function AccountFailureCard({ accountStatus, snapshot, t, rpc, onRecovered, onAccountChange = () => {} }) {
   const retrying = snapshot.retrying === true
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const clear = async () => {
     if (!confirm) { setConfirm(true); return }
+    onAccountChange()
     setBusy(true); setFailed(false)
-    try { const next = await recoveryCall(rpc, 'logout'); accountStatus.acceptAccount(next); onRecovered(); notifyQuickQuota() }
+    try { const next = await recoveryCall(rpc, 'logout'); onAccountChange(); accountStatus.acceptAccount(next); onRecovered(); notifyQuickQuota() }
     catch { setFailed(true) }
     finally { setBusy(false); setConfirm(false) }
   }

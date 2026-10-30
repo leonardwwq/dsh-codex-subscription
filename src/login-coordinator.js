@@ -72,6 +72,8 @@ export class CodexLoginCoordinator {
   constructor(auth, options = {}) {
     this.auth = auth
     this.createId = options.createId ?? (() => crypto.randomUUID())
+    this.onLoginStart = options.onLoginStart
+    this.onLoginSettled = options.onLoginSettled
   }
 
   async accountStatus(options) {
@@ -179,8 +181,13 @@ export class CodexLoginCoordinator {
       },
     }
 
-    session.run = Promise.resolve()
-      .then(() => this.auth.login(interaction, label === undefined ? {} : { label: label.trim() }))
+    // Suspend remote access before the provider can commit new credentials.
+    let suspension
+    let suspended = false
+    let loginStarted = false
+    try { suspension = Promise.resolve(this.onLoginStart?.(id)) } catch (error) { suspension = Promise.reject(error) }
+    session.run = suspension
+      .then(() => { suspended = true; controller.signal.throwIfAborted(); loginStarted = true; return this.auth.login(interaction, label === undefined ? {} : { label: label.trim() }) })
       .then(async () => {
         if (controller.signal.aborted) return
         const status = await this.auth.status()
@@ -205,7 +212,7 @@ export class CodexLoginCoordinator {
           return
         }
         try {
-          if (label !== undefined) throw error
+          if (!loginStarted || label !== undefined) throw error
           const status = await this.auth.status()
           if (status.authenticated === true) {
             session.view = {
@@ -235,7 +242,11 @@ export class CodexLoginCoordinator {
         // Provider errors may contain credentials. Keep the diagnostic host-only.
         session.hostError = error
       })
-      .finally(publishReady)
+      .finally(() => {
+        // Resume independently of polling and never expose cleanup failures as login failures.
+        try { void Promise.resolve(this.onLoginSettled?.(id, suspended)).catch(() => {}) } catch { /* auxiliary cleanup */ }
+        publishReady()
+      })
 
     return ready.promise
   }

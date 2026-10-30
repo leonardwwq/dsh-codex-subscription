@@ -1,5 +1,5 @@
 import { Hint, SettingsLabel } from './client-hint.jsx'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { create as createQr } from 'qrcode/lib/core/qrcode.js'
 import { Button, Switch } from './client-primitives.js'
 import { CHANNEL } from './rpc-contract.js'
@@ -32,20 +32,28 @@ export function RemoteControlCard({ rpc, preference, snapshot, t, active = true 
   const [clients, setClients] = useState()
   const [removing, setRemoving] = useState()
   const alive = useRef(false)
+  const generation = useRef(0)
+  const valid = token => alive.current && generation.current === token
   const on = snapshot.remoteControl === 'on'
   const read = async () => {
+    const token = generation.current
     try {
       const result = await rpc.call(CHANNEL, 'remote/status', {})
-      if (alive.current && result.ok) setState(result.value)
+      if (valid(token) && result.ok) setState(result.value)
     } catch { /* the next poll retries */ }
   }
   const readClients = async () => {
+    const token = generation.current
     try {
       const result = await rpc.call(CHANNEL, 'remote/clients', {})
-      if (alive.current && result.ok) setClients(result.value)
+      if (valid(token) && result.ok) setClients(result.value)
     } catch { /* the next refresh retries */ }
   }
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useLayoutEffect(() => {
+    alive.current = true
+    if (!on) { setState(undefined); setPairing(undefined); setClients(undefined); setBusy(false); setRemoving(undefined); setFailed(false) }
+    return () => { alive.current = false; generation.current += 1 }
+  }, [on])
   useEffect(() => {
     if (!on) { setClients(undefined); return undefined }
     if (!active) return undefined
@@ -56,12 +64,13 @@ export function RemoteControlCard({ rpc, preference, snapshot, t, active = true 
   }, [on, rpc, active])
   const remove = async client => {
     if (removing) return
+    const token = generation.current
     setRemoving(client.clientId); setFailed(false)
     try {
       const result = await rpc.call(CHANNEL, 'remote/revoke', { clientId: client.clientId })
-      if (!alive.current) return
+      if (!valid(token)) return
       if (result.ok) setClients(result.value); else setFailed(true)
-    } catch { if (alive.current) setFailed(true) } finally { if (alive.current) setRemoving(undefined) }
+    } catch { if (valid(token)) setFailed(true) } finally { if (valid(token)) setRemoving(undefined) }
   }
   useEffect(() => {
     if (!on) { setState(undefined); setPairing(undefined); return undefined }
@@ -79,14 +88,15 @@ export function RemoteControlCard({ rpc, preference, snapshot, t, active = true 
   }, [pairing, active])
   const pair = async () => {
     if (busy) return
+    const token = generation.current
     setBusy(true); setFailed(false)
     try {
       const result = await rpc.call(CHANNEL, 'remote/pair', {})
-      if (!alive.current) return
+      if (!valid(token)) return
       if (!result.ok) { setFailed(true); return }
       setPairing(result.value); setNow(Date.now())
       void read()
-    } catch { if (alive.current) setFailed(true) } finally { if (alive.current) setBusy(false) }
+    } catch { if (valid(token)) setFailed(true) } finally { if (valid(token)) setBusy(false) }
   }
   const expired = pairing && pairing.expiresAt <= now
   const minutes = pairing ? Math.max(0, Math.ceil((pairing.expiresAt - now) / 60000)) : 0

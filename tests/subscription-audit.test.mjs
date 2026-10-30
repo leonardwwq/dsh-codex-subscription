@@ -129,6 +129,13 @@ test('tool cancellation and failure stay distinct and operation history is bound
   assert.equal(store.snapshot().dropped, 10)
 })
 
+test('failed RPC observations never log exception details', async () => {
+  diagnosticLog.clear()
+  const invoke = createDiagnosticOperations().wrap(async () => { throw new Error('private credential xyz987') })
+  await assert.rejects(invoke('status', {}, new AbortController().signal), /private credential/)
+  assert.doesNotMatch(JSON.stringify(diagnosticLog.snapshot()), /private credential|xyz987/)
+})
+
 test('a failing host scope does not hide other scopes or an unsupported host', async () => {
   const health = createHostDiagnostics()
   health.register({ snapshot: () => { throw Error('private') } })

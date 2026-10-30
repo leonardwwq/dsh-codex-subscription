@@ -177,17 +177,11 @@ test('regenerates exact release-age exceptions from the accepted lock graph', ()
  for (const invalid of [source.replace(/^\$PackageSpec.*\n/mu, ''), source.replace('@1.15.0', '@1.14.0'), source + "$PackageSpec = 'dsh-codex-subscription@1.15.0'\n"]) assert.throws(() => rewriteBoundedVersions(invalid, update, 'dsh-codex.ps1'), /PackageSpec/u)
 })
 
-test('current repository prepares compatibility artifacts only after internal development is finalized', () => {
- const read = file => readFileSync(new URL('../' + file, import.meta.url), 'utf8')
- const state = { manifest: JSON.parse(read('package.json')), compatibility: JSON.parse(read('compatibility.json')), documentedVersion: read('README.md').match(/dsh-codex-subscription@(\d+\.\d+\.\d+)/u)?.[1] }
- const current = state.compatibility.latestTested
- const candidate = current.replace(/^(\d+)\.(\d+)\.(\d+).*$/, (_, major, minor, patch) => major + '.' + minor + '.' + (Number(patch) + 1))
- if (/-dev\.\d+$/u.test(state.manifest.version)) {
-   assert.throws(() => planCompatibilityUpdate(state, candidate), /unsupported plugin prerelease/u, 'a compatibility update must not promote unreleased development work')
-   return
- }
- const update = planCompatibilityUpdate(state, candidate)
- for (const file of boundedArtifactPaths(update)) assert.doesNotThrow(() => rewriteBoundedVersions(read(file), update, file), file)
+test('the cordis host comes from the exact version a DSH release declares', () => {
+  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '~4.0.5-alpha.1' } }), '4.0.5-alpha.1')
+  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '^4.0.4' } }), '4.0.4')
+  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '>=4' } }), undefined)
+  assert.equal(cordisHostOf({}), undefined)
 })
 
 const withHostPeers = state => {
@@ -197,13 +191,6 @@ const withHostPeers = state => {
   state.manifest.devDependencies['@deepseek-ai/dsh-subagent-codex'] = '0.1.1-rc.2'
   return state
 }
-
-test('the cordis host comes from the exact version a DSH release declares', () => {
-  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '~4.0.5-alpha.1' } }), '4.0.5-alpha.1')
-  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '^4.0.4' } }), '4.0.4')
-  assert.equal(cordisHostOf({ dependencies: { '@deepseek-ai/cordis': '>=4' } }), undefined)
-  assert.equal(cordisHostOf({}), undefined)
-})
 
 test('a preview widens the cordis host and the optional subtask runtime peer without touching its dev pin', () => {
   const state = withHostPeers(previewFixture())

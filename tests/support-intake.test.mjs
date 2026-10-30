@@ -73,7 +73,7 @@ test("both public readmes link directly to the guided bug report", async () => {
     readFile(chineseReadme, "utf8"),
     readFile(englishReadme, "utf8"),
   ]);
-  const issueUrl = "https://github.com/WSL043/dsh-codex-subscription/issues/new?template=install-problem.yml";
+  const issueUrl = "https://github.com/leonardwwq/dsh-codex-subscription/issues/new?template=install-problem.yml";
 
   assert.match(zh, new RegExp(issueUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(en, new RegExp(issueUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

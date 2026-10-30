@@ -1,4 +1,9 @@
 {
+  "evidence": {
+    "scope": "The legacy latestTested, supported and previews lists describe historical pre-lite compatibility claims, not verification of the lite build.",
+    "liteVerified": ["0.2.1-rc.5"],
+    "liteVerification": "3.2.1-lite.1 candidate on macOS: credential-free real-host install, activation and status/remote-status RPC only; no real-account, conflict, Windows, or other version coverage."
+  },
   "latestTested": "0.2.1-rc.5",
   "supported": [
     "0.1.7-rc.2",

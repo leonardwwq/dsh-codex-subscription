@@ -133,6 +133,29 @@ test('remote display polling pauses while hidden and returns without regeneratin
   } finally { h.dispose() }
 })
 
+test('remote switch off invalidates pending pair and clients responses after re-enable', async () => {
+  const pair = deferred(), clients = deferred()
+  let clientCalls = 0
+  const rpc = { call(_channel, endpoint) {
+    if (endpoint === 'remote/pair') return pair.promise
+    if (endpoint === 'remote/clients' && ++clientCalls === 1) return clients.promise
+    return Promise.resolve({ ok: true, value: endpoint === 'remote/clients' ? [] : { status: 'connected' } })
+  } }
+  const h = await component('client-remote-control.jsx', 'RemoteControlCard', { rpc, snapshot: { remoteControl: 'on' }, t: key => key })
+  try {
+    await flush(); h.render()
+    nodes(h.tree, node => node.props.children === 'remotePair')[0].props.onClick()
+    h.render({ snapshot: { remoteControl: 'off' } })
+    h.render({ snapshot: { remoteControl: 'on' } })
+    pair.resolve({ ok: true, value: { pairingCode: 'stale', expiresAt: Date.now() + 60000 } })
+    clients.resolve({ ok: true, value: [{ clientId: 'old', name: 'Old phone' }] })
+    await flush(); h.render()
+    assert.equal(nodes(h.tree, node => node.type?.name === 'Qr').length, 0)
+    assert.equal(nodes(h.tree, node => node.props.role === 'listitem').length, 0)
+    assert.equal(nodes(h.tree, node => node.props.children === 'remotePair')[0].props.disabled, false)
+  } finally { h.dispose() }
+})
+
 test('a started runtime installation keeps its progress and finishes across hidden tabs', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   let status = { phase: 'idle', available: true, installable: true, componentVersion: 'fixture' }, reads = 0, loads = 0

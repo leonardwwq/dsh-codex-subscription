@@ -1,26 +1,24 @@
 export const CHANNEL = '/codex-subscription'
 export const RPC_ENDPOINTS = Object.freeze([
   'status', 'login/start', 'login/status', 'login/submit', 'login/cancel', 'logout',
-  'account/select', 'account/remove', 'usage', 'usage/accounts', 'usage/history', 'usage/profile', 'diagnostics',
+  'account/select', 'account/remove', 'usage/accounts',
   'preferences/status', 'preferences/models', 'preferences/update',
-  'default-model/status', 'default-model/select', 'default-model/reset',
-  'predictions/generate',
-  'runtime/status', 'runtime/install', 'runtime/remove', 'runtime/cancel',
-  'storage/status', 'storage/clear-forecast',
-  'voice/start', 'voice/stop', 'voice/status', 'voice/interrupt', 'voice/preview', 'voice/catalog',
-  'voice/native/probe', 'voice/native/start', 'voice/native/status', 'voice/native/control', 'voice/native/stop',
-  'remote/status', 'remote/enable', 'remote/disable', 'remote/pair', 'remote/clients', 'remote/revoke',
-  'reset-credit/inspect', 'reset-credit/prepare', 'reset-credit/consume',
-  'image/original/chunk',
-  'sketch/connect', 'sketch/poll', 'sketch/claim', 'sketch/result', 'sketch/disconnect',
+  'remote/status', 'remote/pair', 'remote/clients', 'remote/revoke',
 ])
 
 // Components use a plugin-scoped client; DSH owns transport and authentication.
 export function createSubscriptionRpcClient(transport) {
   return Object.freeze({
-    call(channel, endpoint, payload, signal) {
+    async call(channel, endpoint, payload, signal) {
       if (channel !== CHANNEL || !RPC_ENDPOINTS.includes(endpoint)) throw new Error('Invalid subscription RPC target')
-      return transport.call('/api', `codex-subscription/${endpoint}`, payload, signal)
+      try {
+        return await transport.call('/api', `codex-subscription/${endpoint}`, payload, signal)
+      } catch (error) {
+        // DSH reports a route it never received as a transport failure; keep the
+        // browser console able to say which call broke.
+        try { console.error(`[codex-subscription] ${endpoint} failed`) } catch { /* console may be gone */ }
+        throw error
+      }
     },
   })
 }

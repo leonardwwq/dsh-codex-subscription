@@ -24,7 +24,8 @@ export async function settlesLive(preferences, patch, signal, { attempts = 8, de
   return live()
 }
 
-export function createSubscriptionRpcHandler({ authHandler, usageReader, accountUsageReader, planHistoryReader, usageProfileReader, resetCreditService, preferences, defaultModel, runtimeManagement, remoteControl, desktopVoice, nativeVoice, voicePreview, composerPredictions, diagnosticsReader, modelCatalog, originalImages, resolveInheritedOriginal, closeConnections, onAccountChanged, onCleanupFailure }) {
+export function createSubscriptionRpcHandler({ authHandler, usageReader, accountUsageReader, planHistoryReader, usageProfileReader, resetCreditService, preferences, defaultModel, runtimeManagement, remoteControl, loginLifecycleManaged = false, desktopVoice, nativeVoice, voicePreview, composerPredictions, diagnosticsReader, modelCatalog, originalImages, resolveInheritedOriginal, closeConnections, onAccountChanged, onCleanupFailure }) {
+  const completedLogins = new Set()
   return async (endpoint, payload, signal) => {
     if (endpoint === 'predictions/generate') {
       try {
@@ -365,13 +366,39 @@ export function createSubscriptionRpcHandler({ authHandler, usageReader, account
         return publicError('internal', message)
       }
     }
-    const result = await authHandler(endpoint, payload, signal)
-    if (result.ok === true && (endpoint === 'logout' || endpoint === 'account/select' || endpoint === 'account/remove'
-      || (endpoint === 'login/status' && result.value?.authenticated === true))) {
+    const accountTransaction = ['logout', 'account/select', 'account/remove'].includes(endpoint)
+    const managed = accountTransaction && typeof remoteControl?.suspend === 'function' && typeof remoteControl?.resume === 'function'
+    if (managed) {
+      try { await remoteControl.suspend() } catch {
+        try { onCleanupFailure?.() } catch { /* diagnostics only */ }
+        return publicError('unavailable', 'Could not safely change the account')
+      }
+    }
+    let result
+    try {
+      result = await authHandler(endpoint, payload, signal)
+    } finally {
+      if (managed) {
+        try { await remoteControl.resume() } catch {
+          try { onCleanupFailure?.() } catch { /* diagnostics only */ }
+        }
+      }
+    }
+    const loginId = result.value?.id ?? payload?.id
+    const completedLogin = result.ok === true && endpoint === 'login/status' && result.value?.authenticated === true
+      && (typeof loginId !== 'string' || !completedLogins.has(loginId))
+    if (completedLogin && typeof loginId === 'string') {
+      completedLogins.add(loginId)
+      if (completedLogins.size > 128) completedLogins.delete(completedLogins.values().next().value)
+    }
+    if (result.ok === true && (endpoint === 'logout' || endpoint === 'account/select' || endpoint === 'account/remove' || completedLogin)) {
       // The account transaction has committed. Auxiliary cache failures must not
       // misreport that transaction or prevent the remaining invalidations.
-      const tasks = [() => closeConnections?.(), () => usageReader.clearCache(), () => planHistoryReader?.clear(), () => usageProfileReader?.clear(),
-        () => resetCreditService.clear(), () => modelCatalog?.clear(), () => onAccountChanged?.()]
+      // Detach the old account synchronously before yielding to other cleanup.
+      let remoteReset
+      try { if (!managed && !(completedLogin && loginLifecycleManaged)) remoteReset = remoteControl?.accountChanged?.() } catch (error) { remoteReset = Promise.reject(error) }
+      const tasks = [() => remoteReset, () => closeConnections?.(), () => usageReader.clearCache(), () => planHistoryReader?.clear(), () => usageProfileReader?.clear(),
+        () => resetCreditService?.clear(), () => modelCatalog?.clear(), () => onAccountChanged?.()]
       if (endpoint === 'logout') tasks.push(() => usageReader.clear(), () => accountUsageReader?.clear())
       if (endpoint === 'account/remove' && typeof payload?.id === 'string') tasks.push(() => usageReader.clearScope(payload.id))
       const outcomes = await Promise.allSettled(tasks.map(task => Promise.resolve().then(task)))

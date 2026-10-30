@@ -146,6 +146,30 @@ function Start-And-ProbeWeb {
         }
         $startupLog = Get-Content -LiteralPath $stdout -Raw
         if ($startupLog -notmatch 'dsh web:') { throw 'DSH web readiness was not logged.' }
+
+        # Exercise the activated candidate, not just the HTML shell. The web session
+        # above holds only this disposable host's token; do not print it or RPC data.
+        foreach ($endpoint in @('status', 'remote/status')) {
+            $rpcBody = @{
+                type = 'client-request'
+                rpcId = [Guid]::NewGuid().ToString()
+                method = "codex-subscription/$endpoint"
+                payload = @{}
+            } | ConvertTo-Json -Depth 5 -Compress
+            try {
+                $rpc = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/api/codex-subscription/$endpoint" `
+                    -WebSession $webSession -ContentType 'application/json' -Body $rpcBody -TimeoutSec 10
+            } catch {
+                throw "Credential-free host RPC $endpoint failed."
+            }
+            if ($rpc.type -ne 'server-response' -or $rpc.result.ok -ne $true) {
+                throw "Credential-free host RPC $endpoint returned an invalid response."
+            }
+            if ($endpoint -eq 'status' -and $rpc.result.value.authenticated -ne $false) {
+                throw 'Disposable host did not report an unauthenticated account.'
+            }
+            Write-Host "Credential-free host RPC $endpoint passed."
+        }
     } finally {
         if (-not $process.HasExited) {
             & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null

@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CODEX_PLAN_HISTORY_URL, createPlanHistoryReader, parsePlanHistory } from '../src/plan-history.js'
-import { createSubscriptionRpcHandler } from '../src/index.js'
-import { RPC_ENDPOINTS } from '../src/rpc-contract.js'
 
 const period = {
   id: 'p1', window_minutes: 10080, plan_type: 'pro', starts_at: '2026-10-03T00:00:00Z', ends_at: '2026-10-10T00:00:00Z',
@@ -109,17 +107,6 @@ test('a background read joins a pending forced refresh instead of restoring the 
   assert.equal(calls.length, 2)
   shared.periods.length = 0
   assert.equal((await instance.read()).periods.length, 1)
-})
-
-test('usage/history is a public endpoint that only surfaces safe messages', async () => {
-  assert.ok(RPC_ENDPOINTS.includes('usage/history'))
-  const signal = new AbortController().signal
-  const ok = createSubscriptionRpcHandler({ planHistoryReader: { read: async () => ({ available: true, periods: [] }), clear() {} } })
-  assert.deepEqual((await ok('usage/history', {}, signal)).value, { available: true, periods: [] })
-  const failing = createSubscriptionRpcHandler({ planHistoryReader: { read: async () => { throw new Error('secret https://host/token') }, clear() {} } })
-  const result = await failing('usage/history', {}, signal)
-  assert.equal(result.ok, false)
-  assert.doesNotMatch(JSON.stringify(result), /secret|token/)
 })
 
 test('the usage profile keeps only statistics, never the name, picture or username', async () => {

@@ -122,27 +122,6 @@ test('disposal from a default-model subscriber stops dispatch and remaining noti
   assert.equal(calls, 0)
 })
 
-test('the default-model control is one settings row over the two RPC endpoints', async () => {
-  assert.ok(RPC_ENDPOINTS.includes('default-model/status'))
-  assert.ok(RPC_ENDPOINTS.includes('default-model/select'))
-  const [controller, preferences, section, client] = await Promise.all([
-    read('src/default-model-controller.js'),
-    read('src/client-preferences.jsx'),
-    read('src/client-section.jsx'),
-    read('src/client.jsx'),
-  ])
-  assert.match(controller, /'default-model\/status'/u)
-  assert.match(controller, /'default-model\/select'/u)
-  assert.match(preferences, /import \{ DefaultModelPreference \} from '\.\/default-model-preferences\.jsx'/u)
-  assert.match(preferences, /<DefaultModelPreference preference=\{preference\} defaultModel=\{defaultModel\} t=\{t\} \/>/u)
-  const modelsSection = preferences.slice(preferences.indexOf("t('modelsSectionTitle')"), preferences.indexOf("t('searchSectionTitle')"))
-  assert.match(modelsSection, /DefaultModelPreference/u, 'the default model sits in the models section')
-  assert.match(section, /<ModelsPage preference=\{preference\} t=\{t\} defaultModel=\{defaultModel\} \/>/u)
-  assert.match(client, /const defaultModel = createDefaultModelController\(rpc\)/u)
-  assert.match(client, /defaultModel\.dispose\(\)/u)
-  assert.match(client, /accountStatus, t, diagnostics, defaultModel/u)
-})
-
 test('both locales describe the default-model control with the follow-state placeholder', () => {
   const keys = ['defaultModelTitle', 'defaultModelHint', 'defaultModelFollow', 'defaultModelFollowHint', 'defaultModelUnknown', 'defaultModelUnavailable', 'defaultModelNoCatalog', 'defaultModelFailed']
   for (const key of keys) {

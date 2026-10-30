@@ -43,7 +43,7 @@ export function createDiagnosticOperations({ now = Date.now } = {}) {
         }
         record(endpoint, result?.ok === true ? 'completed' : 'failed')
         return result
-      } catch (error) { record(endpoint, signal?.aborted ? 'cancelled' : 'failed'); if (!signal?.aborted) diagnosticLog.error(actions[endpoint] ?? 'rpc', `${endpoint} threw`, error); throw error }
+      } catch (error) { record(endpoint, signal?.aborted ? 'cancelled' : 'failed'); if (!signal?.aborted) diagnosticLog.error(actions[endpoint] ?? 'rpc', `${endpoint} threw`); throw error }
     },
     tool: (exec, result) => {
       if (!['codex_image_generate', 'codex_sketch'].includes(exec?.name)) return

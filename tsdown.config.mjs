@@ -25,10 +25,7 @@ const clientExternal = [
   '@deepseek-ai/dsh-client-ui-slots',
 ]
 const root = dirname(fileURLToPath(import.meta.url))
-const clientFeatures = [
-  { entry: 'src/client-sketch.jsx', fileName: 'client.sketch.js' },
-  { entry: 'src/client-image-viewer.jsx', fileName: 'client.image-viewer.js' },
-]
+const clientFeatures = []
 
 // Reused pnpm stores can sit outside this checkout. Keep that machine-specific
 // location out of region labels and maps, just as for a local node_modules tree.

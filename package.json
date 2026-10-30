@@ -1,8 +1,8 @@
 {
   "name": "dsh-codex-subscription",
-  "version": "3.2.1",
+  "version": "3.2.1-lite.1",
   "packageManager": "pnpm@11.26.0",
-  "description": "Use ChatGPT and Codex subscriptions in DeepSeek Harness with OAuth, quota, safe resets, web search, images and Fast mode, and control DSH from the ChatGPT mobile app (Beta)",
+  "description": "Lightweight ChatGPT subscription integration and phone remote control for DeepSeek Harness",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -14,12 +14,10 @@
   },
   "files": [
     "lib/*.js",
-    "native/linux-voice-helper.py",
     "locale/*.json",
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
-    "DIRECTORY.md",
     "compatibility.json",
     "LICENSE",
     "SECURITY.md",
@@ -35,10 +33,7 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-model-selection",
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-ui-tool"
+        "@deepseek-ai/dsh-client-ui-settings"
       ],
       "platform": "web"
     }
@@ -52,21 +47,10 @@
   },
   "keywords": [
     "dsh-plugin",
-    "deepseek",
     "deepseek-harness",
-    "dsh",
-    "openai-codex",
     "chatgpt-oauth",
-    "chatgpt",
-    "chatgpt-plus",
-    "subscription",
-    "quota",
-    "quota-reset",
-    "fast-mode",
-    "usage",
-    "oauth",
-    "web-search",
-    "image-generation"
+    "codex",
+    "remote-control"
   ],
   "author": "WSL043",
   "license": "MIT",
